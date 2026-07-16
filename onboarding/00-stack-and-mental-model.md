@@ -3,13 +3,13 @@
 ## One-paragraph story
 
 A training step is a thin Python loop over a deep C++ stack. `nn.Module` holds
-parameters and calls into `nn.functional`, which calls ATen ops. Each op goes
-through the **dispatcher**, which usually hits an **Autograd wrapper** first.
+parameters and calls into `nn.functional`, which calls ATen ops (PyTorch's core tensor operations implemented in C++). Each op goes
+through the **dispatcher** (routing system that chooses the correct implementation (CPU, CUDA, Autograd, etc.) for an operation), which usually hits an **Autograd wrapper** first(the backend kernel does the math; the Autograd wrapper remembers how that math happened so gradients can be computed later).
 That wrapper redispatches to a numeric **ATen/backend kernel**, then stitches
 outputs into a DAG of **Nodes** linked by **Edges**. `loss.backward()` runs the
 **Engine**, which walks the DAG and writes leaf `.grad`. `Optimizer.step()`
 reads those grads and updates parameter storage. Everything below that story
-lives in `c10` (tensor body, storage, devices, dispatch keys).
+lives in `c10` (PyTorch's low-level infrastructure library for tensors, devices, dispatch, and core utilities).
 
 ## Layered dependency map
 
@@ -72,6 +72,14 @@ flowchart LR
 - **View metadata:** sizes, strides, storage offset on `TensorImpl`.
 - **Where to run:** `DispatchKeySet` on `TensorImpl` (+ TLS include/exclude).
 - **How to differentiate:** lazy `AutogradMeta` (`grad_fn`, `grad_`, …).
+  
+To simplify: 
+1) TensorImpl = the tensor's core identity (always exists).
+  - Stores shape, strides, dtype, device, storage pointer, dispatch keys, etc.
+  - It knows what the tensor is and where its data lives.
+2) AutogradMeta = the tensor's gradient information (only allocated if needed).
+  - Stores requires_grad, .grad, grad_fn, version counter, hooks, etc.
+  - It knows how this tensor participates in autograd.
 
 See [02-c10-tensor-and-storage.md](02-c10-tensor-and-storage.md).
 
@@ -96,26 +104,32 @@ End-to-end training: [08-end-to-end-training-step.md](08-end-to-end-training-ste
 
 ```mermaid
 sequenceDiagram
-  participant User
-  participant Module as nn.Module
-  participant F as nn.functional
-  participant Disp as Dispatcher
-  participant AG as Autograd wrapper
-  participant Kern as ATen kernel
-  participant Eng as Engine
-  participant Opt as Optimizer
-  User->>Module: model(x)
-  Module->>F: F.linear(...)
-  F->>Disp: at::linear / addmm
-  Disp->>AG: Autograd* kernel
-  AG->>Kern: redispatch numeric
-  Kern-->>AG: output Tensor
-  AG-->>User: y with grad_fn
-  User->>Eng: loss.backward()
-  Eng->>Eng: Node.apply VJPs
-  Eng-->>User: param.grad filled
-  User->>Opt: opt.step()
-  Opt->>Kern: foreach / fused update
+    participant U as User
+    participant M as nn.Module
+    participant F as nn.functional
+    participant D as Dispatcher
+    participant A as Autograd Wrapper
+    participant K as ATen Backend Kernel
+    participant E as Autograd Engine
+    participant O as Optimizer
+
+    U->>M: model(x)
+    M->>F: F.linear(...)
+    F->>D: at::linear / at::addmm
+
+    D->>A: Dispatch to Autograd
+    A->>D: Redispatch
+    D->>K: Dispatch to CPU/CUDA kernel
+    K-->>A: Output Tensor
+    A-->>U: Tensor with grad_fn
+
+    U->>E: loss.backward()
+    E->>E: Traverse graph (Node.apply)
+    E-->>U: param.grad populated
+
+    U->>O: optimizer.step()
+    O->>K: Parameter update kernel
+    K-->>O: Parameters updated
 ```
 
 ## Mental models that will keep you sane
