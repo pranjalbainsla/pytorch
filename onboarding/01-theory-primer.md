@@ -11,25 +11,25 @@ c10/dispatcher/autograd implementation docs.
 ### Idea
 
 A neural net is a composition of differentiable maps
-\(f = f_n \circ \cdots \circ f_1\). Training needs gradients of a scalar loss
-\(\ell\) w.r.t. parameters.
 
-**Forward mode** AD pushes directional derivatives through the graph
-(good when many outputs, few inputs).
+```math
+f = f_n \circ \cdots \circ f_1
+```
 
-**Reverse mode** AD (backpropagation) pulls *cotangent* / VJP information from
-the scalar loss back to the inputs (good when few outputs—usually one loss—and
+Training needs gradients of a scalar loss $\ell$ w.r.t. parameters.
+
+**Forward mode** AD pushes directional derivatives through the graph (good when many outputs, few inputs).
+
+**Reverse mode** AD (backpropagation) pulls *cotangent* / VJP information from the scalar loss back to the inputs (good when few outputs—usually one loss—and
 many inputs—parameters). PyTorch's default engine is reverse mode.
 
-For a map \(y = f(x)\), the **vector-Jacobian product** (VJP) is:
+For a map $y = f(x)$, the **vector-Jacobian product** (VJP) is:
 
-\[
+```math
 v^\top \frac{\partial f}{\partial x}
-\]
+```
 
-Given upstream grad \(v = \frac{\partial \ell}{\partial y}\), the VJP yields
-\(\frac{\partial \ell}{\partial x}\). Each op only needs its local VJP; chaining
-them recovers the full gradient (chain rule).
+Given upstream grad $v = \frac{\partial \ell}{\partial y}$, the VJP yields $\frac{\partial \ell}{\partial x}$. Each op only needs its local VJP; chaining them recovers the full gradient (chain rule).
 
 ### Why a DAG of Nodes works
 
@@ -189,6 +189,24 @@ AT_DISPATCH_FLOATING_TYPES(dtype, "add", [&] {
 
 That is **compile-time/template dtype dispatch**, not the c10 Dispatcher.
 Confusing the two is a common onboarding failure.
+
+---
+In simple terms:
+Think of PyTorch's dispatcher as a **smart receptionist**. Whenever you call an operation like `torch.add(a, b)`, you don't tell PyTorch exactly how to perform the addition—you simply ask it to "add these tensors." The dispatcher's job is to examine the tensors and decide **which implementation (kernel)** should actually execute the operation.
+
+It looks at several properties of the tensors, such as:
+
+* Are they on the **CPU** or **GPU (CUDA)**?
+* Are they **dense** or **sparse**?
+* Do they require **gradients (Autograd)**?
+
+Because the decision depends on **multiple properties at the same time**, this mechanism is called **multiple dispatch**.
+
+For example, if two tensors are on the CPU and require gradients, the dispatcher first chooses the **Autograd kernel**. This kernel doesn't perform the addition itself; instead, it records the operation so gradients can be computed during backpropagation. Once the bookkeeping is complete, it temporarily removes the Autograd flag and asks the dispatcher to choose again. This time, the dispatcher selects the **CPU kernel**, which finally performs the numerical addition. Removing the Autograd flag prevents the dispatcher from repeatedly selecting the Autograd kernel, avoiding infinite recursion.
+
+A common point of confusion is that **multiple dispatch is different from dtype dispatch**. After the dispatcher has already selected the CPU kernel, the kernel still needs to know whether the tensor elements are `float32`, `float64`, `bfloat16`, etc. This is handled using C++ template macros like `AT_DISPATCH_FLOATING_TYPES`, which generate specialized code for each data type at compile time.
+
+In short, **the dispatcher decides *which kernel* runs, while `AT_DISPATCH_*` decides *which numeric type* that kernel operates on.**
 
 ### Where it shows up
 

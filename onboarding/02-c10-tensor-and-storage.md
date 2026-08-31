@@ -47,7 +47,9 @@ flowchart TB
 
 Callers almost always hold `at::Tensor` / `torch.Tensor`. Metadata and the
 pointer to storage live on **`TensorImpl`**, which is **intrusively
-refcounted**. When the last `Tensor` referring to an impl goes away, the impl
+refcounted** (meaning the object keeps track of how many pointers ("owners")
+refer to it, and deletes itself when that count reaches zero.). When the 
+last `Tensor` referring to an impl goes away, the impl
 (and possibly the storage) is freed.
 
 **Views** create a new `TensorImpl` (new sizes/strides/offset) that points at

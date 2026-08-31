@@ -1,15 +1,12 @@
 # 00 — Stack and Mental Model
 
-## One-paragraph story
-
-A training step is a thin Python loop over a deep C++ stack. `nn.Module` holds
-parameters and calls into `nn.functional`, which calls ATen ops (PyTorch's core tensor operations implemented in C++). Each op goes
-through the **dispatcher** (routing system that chooses the correct implementation (CPU, CUDA, Autograd, etc.) for an operation), which usually hits an **Autograd wrapper** first(the backend kernel does the math; the Autograd wrapper remembers how that math happened so gradients can be computed later).
-That wrapper redispatches to a numeric **ATen/backend kernel**, then stitches
-outputs into a DAG of **Nodes** linked by **Edges**. `loss.backward()` runs the
-**Engine**, which walks the DAG and writes leaf `.grad`. `Optimizer.step()`
-reads those grads and updates parameter storage. Everything below that story
-lives in `c10` (PyTorch's low-level infrastructure library for tensors, devices, dispatch, and core utilities).
+- A training step is a thin Python loop over a deep C++ stack.
+- `nn.Module` holds parameters and calls into `nn.functional`, which calls ATen ops (PyTorch's core tensor operations implemented in C++). 
+- Each op goes through the **dispatcher** (routing system that chooses the correct implementation (CPU, CUDA, Autograd, etc.) for an operation), which usually hits an **Autograd wrapper** first (the backend kernel does the math; the Autograd wrapper remembers how that math happened so gradients can be computed later).
+- That wrapper redispatches to a numeric **ATen/backend kernel**, then stitches outputs into a DAG of **Nodes** linked by **Edges**. 
+- `loss.backward()` runs the **Engine**, which walks the DAG and writes leaf `.grad`. 
+- `Optimizer.step()` reads those grads and updates parameter storage. 
+- Everything below that story lives in `c10` (PyTorch's low-level infrastructure library for tensors, devices, dispatch, and core utilities).
 
 ## Layered dependency map
 
@@ -181,6 +178,13 @@ Treat as opaque unless a doc explicitly opens them:
    print(x.grad_fn)  # None — leaf
    ```
 
+    ```text
+    tensor([[-0.7650, -2.4742, -0.5129],
+          [ 0.0309,  0.0270, -0.7364]], requires_grad=True)
+    tensor(-8.8612, grad_fn=<SumBackward0>)
+    <SumBackward0 object at 0x7c36fa818d00>
+    None
+    ```
 2. From the repo root, skim file headers only (do not read all of each):
 
    - `c10/core/TensorImpl.h`

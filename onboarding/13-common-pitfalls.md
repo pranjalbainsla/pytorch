@@ -198,7 +198,3 @@ start of iteration).
 - [`torch/csrc/autograd/variable.h`](../torch/csrc/autograd/variable.h)
 - [`aten/src/ATen/native/README.md`](../aten/src/ATen/native/README.md)
 - [`torch/optim/optimizer.py`](../torch/optim/optimizer.py)
-
-## Next
-
-[14-six-month-roadmap.md](14-six-month-roadmap.md).
