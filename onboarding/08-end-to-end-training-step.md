@@ -131,6 +131,11 @@ print(loss.grad_fn)
 print(loss.grad_fn.next_functions)
 ```
 
+```text
+<NllLossBackward0 object at 0x7e7a258a96c0>
+((<LogSoftmaxBackward0 object at 0x7e7a2334c3a0>, 0),)
+```
+
 Leaves (`weight`, `bias`) appear as `AccumulateGrad` sinks via
 `next_functions`, not as `grad_fn` on the Parameter itself (`param.grad_fn`
 is `None` for leaves).

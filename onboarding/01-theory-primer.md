@@ -313,6 +313,9 @@ Deep dive: [04-aten-and-codegen.md](04-aten-and-codegen.md).
    t = torch.randn(2, 3)
    print(t.stride(), t.T.stride(), t.T.is_contiguous())
    ```
+   ```text
+   (3, 1) (1, 3) False
+   ```
 
 ## Related files
 

@@ -70,6 +70,7 @@ From headers and [`aten/src/README.md`](../aten/src/README.md) heritage notes:
 2. **Aliasing ⇒ same storage** for ordinary views.
 3. Allocators produce `DataPtr`s: CPU via [`c10/core/CPUAllocator.*`](../c10/core/CPUAllocator.h);
    CUDA caching allocator under [`c10/cuda/`](../c10/cuda/).
+> The caching part of the CUDA allocator is important for performance: instead of constantly asking the GPU/driver for new memory and returning it, PyTorch can keep previously allocated blocks around and reuse them.
 
 ### Copy-on-write (COW)
 
@@ -82,7 +83,9 @@ COW to contribute to most ops; know that “same storage” is not always foreve
 
 ```python
 t = torch.empty(2, 3, dtype=torch.float32, device="cpu",
-                memory_format=torch.contiguous_format)
+                memory_format=torch.contiguous_format) 
+# torch.empty(...) creates a tensor without initializing its values
+# it just allocates the required memory
 ```
 
 | Concept | Meaning |
